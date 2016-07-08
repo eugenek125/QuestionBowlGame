@@ -1,0 +1,156 @@
+<html>
+<head>
+<script src='https://www.gstatic.com/firebasejs/3.0.3/firebase.js'></script>
+<title>Question Bowl Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+<script>
+
+document.addEventListener('DOMContentLoaded', function() {
+  var groupInput = document.getElementById('group'),
+      groupButton = document.getElementById('group-submit'),
+      questionInput = document.getElementById('quest'),
+      questionButton = document.getElementById('question-submit'),
+      // questionList = document.getElementById('question-list'),
+      nextButton = document.getElementById('next-submit'),
+      nextQuestion = document.getElementById('question-text'),
+      groupExists = false,
+      groupName = "";
+
+  // Set up Firebase Config
+  // TODO: get values from console.firebase.google.com
+  var config = {
+      apiKey: "AIzaSyCwhYInG6uhOn92Zf8QECaFIcGh7vMlvhg",
+      authDomain: "questionbowl.firebaseapp.com",
+      databaseURL: "https://questionbowl.firebaseio.com"
+  };
+
+  // Initilize Firebase App, get DB and Storage services
+  var app = firebase.initializeApp(config),
+      database = app.database();
+
+  // Handle group name check
+  function handleGroupSubmit(e) {
+    groupName = groupInput.value;
+    e.preventDefault();
+    database.ref('groups/').once('value').then(function(snapshot) {
+      groups = snapshot.val();
+      for (var key in groups) {
+        if (groupName == groups[key]) {
+          groupExists = true;
+        }
+      }
+      if (!groupExists) {
+        database.ref('groups/').push(groupName);
+        groupExists = true;
+      }
+      updateGroupDiv();
+    });
+  }
+
+  function updateGroupDiv(){
+    var groupDiv = document.getElementById('group-name'),
+        questionDiv = document.getElementById('new-question'),
+        nextDiv = document.getElementById('next-question');
+
+    groupDiv.innerHTML = "Hello " + groupName + "!";
+    questionDiv.style.visibility = "visible";
+    nextDiv.style.visibility = "visible";
+
+    database.ref().child(groupName + '/questions').on('child_added', function(snapshot) {
+      data = snapshot.val()
+      var li = document.createElement('li');
+      li.innerText = data;
+      // questionList.appendChild(li);
+      updateQuestionCount();
+    });
+
+    database.ref().child(groupName + '/questions').on('child_removed', function(snapshot) {
+      data = snapshot.val();
+      updateQuestion(data);
+      updateQuestionCount();
+    });
+  }
+
+  // Handle question upload to the database
+  function handleQuestionSubmit(e) {
+    e.preventDefault();
+    database.ref(groupName + '/questions/').push(quest.value);
+    updateQuestionCount();
+  }
+
+  function updateQuestionCount() {
+    var countDiv = document.getElementById('question-count');
+    
+    database.ref(groupName + '/questions').once('value').then(function(snapshot) {
+      if (snapshot.val() == null) {
+        countDiv.innerText = 0;
+        nextButton.style.visibility = "hidden";
+      } else {
+        countDiv.innerText = Object.keys(snapshot.val()).length;
+      }
+    });
+  }
+
+  function getNextQuestion() {
+    database.ref(groupName + '/questions').once('value').then(function(snapshot) {
+      var key = pickRandomProperty(snapshot.val());
+      updateQuestion(snapshot.val()[key]);
+      deleteQuestion(key);
+    });
+  }
+
+  function deleteQuestion(key) {
+    database.ref(groupName + '/questions/' + key).remove();
+    updateQuestionCount();
+  }
+
+  function updateQuestion(question) {
+    nextQuestion.innerText = question;
+  }
+
+  function pickRandomProperty(obj) {
+    var result;
+    var count = 0;
+
+    for (var prop in obj)
+      if (Math.random() < 1/++count)
+        result = prop;
+    return result;
+  } 
+
+  nextButton.addEventListener('click', getNextQuestion, false);
+  groupButton.addEventListener('click', handleGroupSubmit, false);
+  questionButton.addEventListener('click', handleQuestionSubmit, false);
+});
+
+</script>
+</head>
+<body>
+  <div id="group-name">
+    Enter a group name:
+    <input type="group" id="group" name="group">
+    <input type="submit" id="group-submit" value="Submit">
+  </div>
+  <br/>
+  <br/>
+  <div id="new-question" style="visibility:hidden;">
+    Enter a question:
+    <input type="question" id="quest" name="question">
+    <input type="submit" id="question-submit" value="Submit">
+<!--     <div id="question-list">
+    </div> -->
+  </div>
+  <br/>
+  <br/>
+  <div id="next-question" style="visibility:hidden;">
+    <div id="question-text">
+    </div>
+    <input type="submit" id="next-submit" value="Next Q">
+    <br/>
+    <br/>
+    Questions remaining:
+    <span id="question-count">
+    </span>
+  </div>
+</body>
+</html>
